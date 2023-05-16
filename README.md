@@ -17,4 +17,8 @@ By transposing the data, you are able to use the first column in each row as a h
 This way when I select my data in vMix, it's all labeled, and the layout in google sheets is somewhat sane.
 When I select a data source in vMix I just select "Casters" and then the row number depending on which caster I want. Caster 1? Row 1, etc.
 
+In this case, if I want to select Jim on my data source, I select casters from my dropdown list, and select row 1. Remember, after it gets transposed, the first columns act as headers. So what looks like row 2, is actually row 1. Just think of it like it's the first piece of data after the label. Data 1.
+
+
+
 So far this system has been very reliable.
