@@ -10,9 +10,9 @@ By transposing the data, you are able to use the first column in each row as a h
 
 2   Playername    Savage    Pete    Jim
 
-3   Casters      Jim      gamer12    WDH
+3   Casters        Jim      gamer12    WDH
 
-4   Caster_&    @Jim      @G12      @QDH
+4   Caster_&        @Jim      @G12      @QDH
 
 
 This way when I select my data in vMix, it's all labeled, and the layout in google sheets is somewhat sane.
