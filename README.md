@@ -1,5 +1,6 @@
 # Sheets-Tool
 This python utility grabs a tab from a google sheet using an API key, transposes the data, and saves it as a CSV on the local machine.
+
 It was created to solve a problem when doing vMix broadcasts where you'll run into API limits within vMix itself. With this tool you can grab a new CSV every second and never time out the API. 
 
 Why does the data transpose? I'm glad you asked.
