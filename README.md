@@ -7,8 +7,11 @@ vMix has a feature where it can use first columns as headers, but often laying o
 By transposing the data, you are able to use the first column in each row as a header effectively. So on my vMix output sheet I have my data laid out like this:
 
 1       2        3       4        5
+
 2 Playername   Savage   Pete     Jim
+
 3 Casters      Jim     gamer12   WDH
+
 4 Caster_&     @Jim     @G12     @QDH
 
 
