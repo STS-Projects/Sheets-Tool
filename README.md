@@ -6,13 +6,13 @@ Why does the data transpose? I'm glad you asked.
 vMix has a feature where it can use first columns as headers, but often laying out your data like that leads to a very WIDE spreadsheet without much past row 5 or 6.
 By transposing the data, you are able to use the first column in each row as a header effectively. So on my vMix output sheet I have my data laid out like this:
 
-1       2        3       4        5
+1      2          3      4        5
 
-2 Playername   Savage   Pete     Jim
+2 Playername    Savage    Pete    Jim
 
-3 Casters      Jim     gamer12   WDH
+3 Casters      Jim      gamer12    WDH
 
-4 Caster_&     @Jim     @G12     @QDH
+4 Caster_&    @Jim      @G12      @QDH
 
 
 This way when I select my data in vMix, it's all labeled, and the layout in google sheets is somewhat sane.
