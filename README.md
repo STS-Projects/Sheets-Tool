@@ -21,7 +21,7 @@ In this case, if I want to select Jim on my data source, I select casters from m
 
 So far this system has been very reliable.
 
-#Dependencies for users to install if not running the exe
+# Dependencies for users to install if not running the exe
 
 requests: pip install requests
 pandas: pip install pandas
