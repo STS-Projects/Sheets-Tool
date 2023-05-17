@@ -19,6 +19,10 @@ When I select a data source in vMix I just select "Casters" and then the row num
 
 In this case, if I want to select Jim on my data source, I select casters from my dropdown list, and select row 1. Remember, after it gets transposed, the first columns act as headers. So what looks like row 2, is actually row 1. Just think of it like it's the first piece of data after the label. Data 1.
 
-
-
 So far this system has been very reliable.
+
+#Dependencies for users to install if not running the exe
+
+requests: pip install requests
+pandas: pip install pandas
+tkinter: pip install tkinter
