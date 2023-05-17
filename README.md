@@ -24,5 +24,7 @@ So far this system has been very reliable.
 # Dependencies for users to install if not running the exe
 
 requests: pip install requests
+
 pandas: pip install pandas
+
 tkinter: pip install tkinter
