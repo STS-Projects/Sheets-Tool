@@ -4,7 +4,7 @@ This python utility grabs a tab from a google sheet using an API key, transposes
 It was created to solve a problem when doing vMix broadcasts where you'll run into API limits within vMix itself. With this tool you can grab a new CSV every second and never time out the API. 
 
 Why does the data transpose? I'm glad you asked.
-vMix has a feature where it can use first columns as headers, but often laying out your data like that leads to a very WIDE spreadsheet without much past row 5 or 6.
+vMix has a feature where it can use first columns as headers, but often laying out your data like that leads to a very W I D E spreadsheet without much past row 5 or 6.
 By transposing the data, you are able to use the first column in each row as a header effectively. So on my vMix output sheet I have my data laid out like this:
 
 | Column 1 | Column 2 | Column 3 | Column 4 |
