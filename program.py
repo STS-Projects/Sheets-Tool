@@ -1,277 +1,281 @@
-import requests
-import pandas as pd
-import tkinter as tk
 import threading
 import time
+import tkinter as tk
+from tkinter import messagebox
+import configparser
+import pandas as pd
+import requests
+
 
 # Libraries used:
 # requests: pip install requests
 # pandas: pip install pandas
 # tkinter: pip install tkinter
 
-# Create a global variable to store the state of the secondary loop thread
-running = False
+class SheetsExtractProgram:
 
+    # this dunder always starts as soon as the class is called/instantiated
+    def __init__(self):
+        # initial values for class variables
+        self.error_message = ""
+        self.spreadsheet_id = ""
+        self.worksheet = ""
+        self.api_key = ""
+        self.seconds = 1
+        self.filename = ""
+        self.threadRunning = False
+        self.errorMessage = None
+        self.thread = None
+        self.config_file = "config.ini"
+        self.config = configparser.ConfigParser()
 
-# Define a function to write and print a log message and append it to the text widget # Modified to embed the log into the GUI
-def log(message):
-    try:
-        print(message)
-        log_text.insert(tk.END, message + "\n")
-        log_text.see(tk.END)
-    except Exception as e:
-        # Print and append any error in opening or writing to the log file
-        print(f"Error opening or writing to log file: {e}")
-        log_text.insert(tk.END, f"Error opening or writing to log file: {e}\n")
-        log_text.see(tk.END)
-
-# Create a config file if it does not exist and load it on startup
-config_file = "config.txt"
-try:
-    with open(config_file, "r") as f:
-        lines = f.readlines()
+        # load config file or set config file if it doesn't exist
         try:
-            spreadsheet_id = lines[0].strip()
-        except IndexError:
-            spreadsheet_id = "" # Added to handle missing parameter in config file
+            self.config.read(self.config_file)
+        except Exception:
+            SheetsExtractProgram.show_error_message("Unable to load config.ini Try deleting it, or checking the "
+                                                    "headers.")
+            return
+
         try:
-            worksheet = lines[1].strip()
-        except IndexError:
-            worksheet = "" # Added to handle missing parameter in config file
+            self.spreadsheet_id = self.config['MAIN']['spreadsheet_id']
+            self.worksheet = self.config['MAIN']['worksheet']
+            self.api_key = self.config['MAIN']['api_key']
+            self.seconds = float(self.config['MAIN']['seconds'])
+            self.filename = self.config['MAIN']['filename']
+        except Exception:
+            if not self.config.has_section('MAIN'):
+                self.config.add_section('MAIN')
+            self.config.set('MAIN', 'spreadsheet_id', self.spreadsheet_id)
+            self.config.set('MAIN', 'worksheet', self.worksheet)
+            self.config.set('MAIN', 'api_key', self.api_key)
+            self.config.set('MAIN', 'seconds', str(self.seconds))
+            self.config.set('MAIN', 'filename', self.filename)
+
+            with open(self.config_file, 'w') as configfile:
+                self.config.write(configfile)
+
+        # Create the GUI with the text boxes, buttons and status box
+        self.window = tk.Tk()
+        self.window.title("Google Sheet Data Puller")
+        self.window.geometry("700x600")  # Changed to make the window taller
+        self.window.resizable(True, True)
+
+        # Create a frame to hold the text boxes and labels
+        self.frame = tk.Frame(self.window)
+        self.frame.grid(row=0, column=0)
+
+        # Create the text boxes and labels for the spreadsheet ID, worksheet name, API key,
+        # seconds to loop and filename # Added a text box and a label for the filename
+        self.spreadsheet_id_entry = tk.Entry(self.frame, width=30, font=("Arial", 16))
+        self.spreadsheet_id_entry.insert(0, self.spreadsheet_id)
+        self.spreadsheet_id_label = tk.Label(self.frame, text="Spreadsheet ID:", font=("Arial", 16))
+        self.worksheet_entry = tk.Entry(self.frame, width=30, font=("Arial", 16))
+        self.worksheet_entry.insert(0, self.worksheet)
+        self.worksheet_label = tk.Label(self.frame, text="Worksheet Name:", font=("Arial", 16))
+        self.api_key_entry = tk.Entry(self.frame, width=30, font=("Arial", 16))
+        self.api_key_entry.insert(0, self.api_key)
+        self.api_key_label = tk.Label(self.frame, text="API Key:", font=("Arial", 16))
+        self.seconds_entry = tk.Entry(self.frame, width=30, font=("Arial", 16))
+        self.seconds_entry.insert(0, str(self.seconds))
+        self.seconds_label = tk.Label(self.frame, text="Seconds to Loop:", font=("Arial", 16))
+        self.filename_entry = tk.Entry(self.frame, width=30,
+                                       font=("Arial", 16))  # Changed the width to make the text box shorter
+        self.filename_entry.insert(0, self.filename)  # Added to insert the filename from the config file
+        self.filename_label = tk.Label(self.frame, text="Output Filename:",
+                                       font=("Arial", 16))  # Added a label for the filename
+        self.csv_label = tk.Label(self.frame, text=".csv",
+                                  font=("Arial", 16))  # Added a label to show the file extension
+
+        # Create the buttons for start/stop and save
+        self.startStop_btn = tk.Button(self.window, text="Start", font=("Arial", 16), width=10)
+        self.save_button = tk.Button(self.window, text="Save", font=("Arial", 16), width=10)
+
+        # Create the status box to show the readiness or running state of the program
+        self.status_box = tk.Label(self.window, text="", font=("Arial", 30), width=10)
+
+        # Arrange the widgets in a grid layout
+        self.spreadsheet_id_label.grid(row=0, column=0)
+        self.spreadsheet_id_entry.grid(row=0, column=1)
+        self.worksheet_label.grid(row=1, column=0)
+        self.worksheet_entry.grid(row=1, column=1)
+        self.api_key_label.grid(row=2, column=0)
+        self.api_key_entry.grid(row=2, column=1)
+        self.seconds_label.grid(row=3, column=0)
+        self.seconds_entry.grid(row=3, column=1)
+        self.filename_label.grid(row=4, column=0)  # Added to place the filename label in the grid layout
+        self.filename_entry.grid(row=4, column=1)  # Added to place the filename text box in the grid layout
+        self.csv_label.grid(row=4, column=2)  # Added to place the file extension label in the grid layout
+        self.startStop_btn.grid(row=5, columnspan=2, pady=5)
+        self.save_button.grid(row=6, columnspan=2, pady=5)
+        self.status_box.grid(row=7, columnspan=2, pady=5)
+        # Create a text widget to display the log # Added to embed the log into the GUI
+        self.log_text = tk.Text(self.window, height=15, font=("Arial", 12))
+        self.log_text.grid(row=8, columnspan=1, pady=5)  # Changed the height to fill the space
+
+        self.startStop_btn.config(command=self.start_loop)
+
+        # Bind the save button to the save settings function
+        self.save_button.config(command=self.save_settings)
+
         try:
-            api_key = lines[2].strip()
-        except IndexError:
-            api_key = "" # Added to handle missing parameter in config file
+            # Print the initial message to the console
+            print("Program started")
+            # Append the initial message to the text widget
+            self.log_text.insert(tk.END, "Program started\n")
+            self.log_text.see(tk.END)
+        except Exception as e:
+            # Print and append any error in opening or writing to the log file
+            print(f"Error opening or writing to log file: {e}")
+            self.log_text.insert(tk.END, f"Error opening or writing to log file: {e}\n")
+            self.log_text.see(tk.END)
+        self.update_status()
+        # starts tk window loop program
+        self.window.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.main_loop()
+        self.window.mainloop()
+
+    def main_loop(self):
+        self.window.after(1000, self.main_loop)
+        self.update_status()
+
+    def on_close(self):
+        self.threadRunning = False
+        self.window.after(1000, self.window.destroy)
+
+    # Define a function to write and print a log message and append it to the text widget
+    # Modified to embed the log into the GUI
+    def log(self, message):
         try:
-            seconds = int(lines[3].strip())
-        except (IndexError, ValueError):
-            seconds = 2 # Added to handle missing or invalid parameter in config file
+            print(message)
+            self.log_text.insert(tk.END, message + "\n")
+            self.log_text.see(tk.END)
+        except Exception as e:
+            # Print and append any error in opening or writing to the log file
+            print(f"Error opening or writing to log file: {e}")
+            self.log_text.insert(tk.END, f"Error opening or writing to log file: {e}\n")
+            self.log_text.see(tk.END)
+
+    # Define a function to update the status box based on the data fields
+    def update_status(self):
+        print("updating values")
+        self.spreadsheet_id = self.spreadsheet_id_entry.get()
+        self.worksheet = self.worksheet_entry.get()
+        self.api_key = self.api_key_entry.get()
         try:
-            filename = lines[4].strip()
-        except IndexError:
-            filename = "" # Added to handle missing parameter in config file
-except FileNotFoundError:
-    with open(config_file, "w") as f:
-        f.write("spreadsheet_id\n")
-        f.write("worksheet\n")
-        f.write("api_key\n")
-        f.write("seconds\n")
-        f.write("filename\n") # Added to create a new config file with the filename field
-    spreadsheet_id = ""
-    worksheet = ""
-    api_key = ""
-    seconds = 0
-    filename = "" # Added to initialize the filename variable
+            self.seconds = float(self.seconds_entry.get())
+        except ValueError:
+            self.seconds = 0
+        self.filename = self.filename_entry.get()  # Added to get the filename from the text box
+        if not self.threadRunning:
+            if self.spreadsheet_id and self.worksheet and self.api_key and self.seconds > 0 and self.filename:  # Added
+                # to check if the filename is not empty
+                self.status_box.config(text="READY", bg="green")
+                # self.log("Status updated: READY")  # Added to log the status update
+            else:
+                self.status_box.config(text="NOT READY", bg="gray")
+                # self.log("Status updated: NOT READY")  # Added to log the status update
 
-# Create the GUI with the text boxes, buttons and status box
-window = tk.Tk()
-window.title("Google Sheet Data Puller")
-window.geometry("600x800") # Changed to make the window taller
-window.resizable(False, False)
+    # Define a function to save the data fields to the config file
+    def save_settings(self):
+        self.update_status()
+        self.config.set('MAIN', 'spreadsheet_id', self.spreadsheet_id)
+        self.config.set('MAIN', 'worksheet', self.worksheet)
+        self.config.set('MAIN', 'api_key', self.api_key)
+        self.config.set('MAIN', 'seconds', str(self.seconds))
+        self.config.set('MAIN', 'filename', self.filename)
+        with open(self.config_file, 'w') as configfile:
+            self.config.write(configfile)
 
-# Create a frame to hold the text boxes and labels
-frame = tk.Frame(window)
-frame.pack(padx=10, pady=10)
+    # Define a function to get the sheet data and transpose it using the pandas library
+    def get_sheet_data(self):
 
-# Create the text boxes and labels for the spreadsheet ID, worksheet name, API key, seconds to loop and filename # Added a text box and a label for the filename
-spreadsheet_id_entry = tk.Entry(frame, width=30, font=("Arial", 16))
-spreadsheet_id_entry.insert(0, spreadsheet_id)
-spreadsheet_id_label = tk.Label(frame, text="Spreadsheet ID:", font=("Arial", 16))
-worksheet_entry = tk.Entry(frame, width=30, font=("Arial", 16))
-worksheet_entry.insert(0, worksheet)
-worksheet_label = tk.Label(frame, text="Worksheet Name:", font=("Arial", 16))
-api_key_entry = tk.Entry(frame, width=30, font=("Arial", 16))
-api_key_entry.insert(0, api_key)
-api_key_label = tk.Label(frame, text="API Key:", font=("Arial", 16))
-seconds_entry = tk.Entry(frame, width=30, font=("Arial", 16))
-seconds_entry.insert(0, seconds)
-seconds_label = tk.Label(frame, text="Seconds to Loop:", font=("Arial", 16))
-filename_entry = tk.Entry(frame, width=30, font=("Arial", 16)) # Changed the width to make the text box shorter
-filename_entry.insert(0, filename) # Added to insert the filename from the config file
-filename_label = tk.Label(frame, text="Output Filename:", font=("Arial", 16)) # Added a label for the filename
-csv_label = tk.Label(frame, text=".csv", font=("Arial", 16)) # Added a label to show the file extension
+        try:
+            response = requests.get(
+                f"https://sheets.googleapis.com/v4/spreadsheets/{self.spreadsheet_id}/values/{self.worksheet}"
+                f"?key={self.api_key}")
+            response.raise_for_status()
+            data = response.json()
+            rows = data["values"]
+            rows.pop(0)
+            tmp = {k[0]: k[1:] for k in rows}
+            tmp = pd.DataFrame.from_dict(tmp, orient='index')
+            tmp = tmp.transpose()
+            tmp.to_csv(self.filename + ".csv", index=False,
+                       encoding="utf-8")  # Changed to use the filename variable as the output file name
+            self.error_message = ""
+            # Log the success message
+            self.log(
+                f"Successfully wrote to {self.filename}.csv")  # Changed to show the filename in the log message
+        except requests.exceptions.HTTPError as e:
+            # Log the HTTP error message
+            self.log(f"HTTP Error: {e}")
+        except PermissionError as e:
+            # Log and show the permission error message
+            self.error_message = "CANNOT WRITE TO DISK, FILE IN USE"
+            self.log(f"Permission Error: {e}\nYou may have the CSV file open, please close it!")
+        except Exception as e:
+            # Log any other error message
+            self.log(f"Other Error: {e}")
 
-# Create the buttons for start, stop and save
-start_button = tk.Button(window, text="Start", font=("Arial", 16), width=10)
-stop_button = tk.Button(window, text="Stop", font=("Arial", 16), width=10)
-save_button = tk.Button(window, text="Save", font=("Arial", 16), width=10)
+    def export_thread(self):
 
-# Create the status box to show the readiness or running state of the program
-status_box = tk.Label(window, text="", font=("Arial", 30), width=10)
+        while self.threadRunning:
+            self.get_sheet_data()
+            time.sleep(self.seconds)
 
-# Create a text widget to display the log # Added to embed the log into the GUI
-log_text = tk.Text(window, font=("Arial", 12))
-log_text.place(x=0, y=550, relwidth=1, height=250) # Changed the height to fill the space
+    # Define a function to start the secondary loop thread
+    def start_loop(self):
 
-# Define a function to update the status box based on the data fields
-def update_status():
-    global spreadsheet_id
-    global worksheet
-    global api_key
-    global seconds
-    global filename # Added to update the filename variable
-    spreadsheet_id = spreadsheet_id_entry.get()
-    worksheet = worksheet_entry.get()
-    api_key = api_key_entry.get()
-    try:
-        seconds = int(seconds_entry.get())
-    except ValueError:
-        seconds = 0
-    filename = filename_entry.get() # Added to get the filename from the text box
-    if spreadsheet_id and worksheet and api_key and seconds > 0 and filename: # Added to check if the filename is not empty
-        status_box.config(text="READY", bg="green")
-        log("Status updated: READY") # Added to log the status update
-    else:
-        status_box.config(text="NOT READY", bg="gray")
-        log("Status updated: NOT READY") # Added to log the status update
+        self.update_status()
+        if self.status_box["text"] == "READY" and self.startStop_btn['text'] == "Start":
+            self.startStop_btn.config(text="Stop")
+            self.status_box.config(text="RUNNING", bg="red")
+            # Gray out the text input boxes
+            self.spreadsheet_id_entry.config(state="disabled")
+            self.worksheet_entry.config(state="disabled")
+            self.api_key_entry.config(state="disabled")
+            self.seconds_entry.config(state="disabled")
+            self.filename_entry.config(state="disabled")  # Added to gray out the filename text box
+            self.threadRunning = True
+            # Create and start the secondary loop thread
+            self.thread = threading.Thread(target=self.export_thread)
+            self.thread.start()
 
-# Define a function to save the data fields to the config file
-def save_settings():
-    global spreadsheet_id
-    global worksheet
-    global api_key
-    global seconds
-    global filename # Added to save the filename variable
-    update_status()
-    try:
-        with open(config_file, "w") as f:
-            f.write(spreadsheet_id + "\n")
-            f.write(worksheet + "\n")
-            f.write(api_key + "\n")
-            f.write(str(seconds) + "\n")
-            f.write(filename + "\n") # Added to save the filename to the config file
-        log("Settings saved") # Added to log the settings save
-    except Exception as e:
-        log(f"Error saving settings: {e}") # Added to log any error in saving settings
+            # Log that the start button was pushed and the thread started
+            self.log("Start button pushed\nSecondary loop thread started")
+            return
+        else:
+            # Log that the start button was pushed but the status was not ready
+            self.log(f"Start button pushed\nStatus not ready")
 
-# Bind the save button to the save settings function
-save_button.config(command=save_settings)
+        if self.startStop_btn['text'] == "Stop":
+            self.startStop_btn.config(text="Start")
+            self.stop_loop()
+            return
 
-# Update the status box initially
-update_status()
-# Arrange the widgets in a grid layout
-spreadsheet_id_label.grid(row=0, column=0)
-spreadsheet_id_entry.grid(row=0, column=1)
-worksheet_label.grid(row=1, column=0)
-worksheet_entry.grid(row=1, column=1)
-api_key_label.grid(row=2, column=0)
-api_key_entry.grid(row=2, column=1)
-seconds_label.grid(row=3, column=0)
-seconds_entry.grid(row=3, column=1)
-filename_label.grid(row=4, column=0) # Added to place the filename label in the grid layout
-filename_entry.grid(row=4, column=1) # Added to place the filename text box in the grid layout
-csv_label.grid(row=4, column=2) # Added to place the file extension label in the grid layout
-start_button.place(x=150, y=250)
-stop_button.place(x=350, y=250)
-save_button.place(x=250, y=350)
-status_box.place(x=195, y=450)
+    # Define a function to stop the secondary loop thread
+    def stop_loop(self):
 
-# Create a global variable to store the state of the secondary loop thread
-running = False
+        self.threadRunning = False
+        self.status_box.config(text="READY", bg="green")
+        # Enable the text input boxes
+        self.spreadsheet_id_entry.config(state="normal")
+        self.worksheet_entry.config(state="normal")
+        self.api_key_entry.config(state="normal")
+        self.seconds_entry.config(state="normal")
+        self.filename_entry.config(state="normal")  # Added to enable the filename text box
+        # Log that the stop button was pushed and the thread stopped
+        self.log("Stop button pushed \nSecondary loop thread stopped")
 
-try:
-    # Print the initial message to the console
-    print("Program started")
-    # Append the initial message to the text widget
-    log_text.insert(tk.END, "Program started\n")
-    log_text.see(tk.END)
-except Exception as e:
-    # Print and append any error in opening or writing to the log file
-    print(f"Error opening or writing to log file: {e}")
-    log_text.insert(tk.END, f"Error opening or writing to log file: {e}\n")
-    log_text.see(tk.END)
+    @staticmethod
+    def show_error_message(message):
+        root = tk.Tk()
+        root.withdraw()  # Hide the root window
+        messagebox.showerror("Error", message)
+        root.destroy()  # Destroy the root window when done
 
-# Define a function to get the sheet data and transpose it using the pandas library
-def get_sheet_data():
-    global error_message
-    try:
-        response = requests.get(
-            f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{worksheet}?key={api_key}")
-        response.raise_for_status()
 
-        data = response.json()
-        rows = data["values"]
-        rows.pop(0)
-        tmp = {k[0]: k[1:] for k in rows}
-        tmp = pd.DataFrame.from_dict(tmp, orient='index')
-        tmp = tmp.transpose()
-        tmp.to_csv(filename + ".csv", index=False, encoding="utf-8") # Changed to use the filename variable as the output file name
-        error_message = ""
-        # Log the success message
-        log(f"Successfully wrote to {filename}.csv") # Changed to show the filename in the log message
-    except requests.exceptions.HTTPError as e:
-        # Log the HTTP error message
-        log(f"HTTP Error: {e}")
-    except PermissionError as e:
-        # Log and show the permission error message
-        error_message = "CANNOT WRITE TO DISK, FILE IN USE"
-        log(f"Permission Error: {e}")
-        log("You may have the CSV file open, please close it!")
-    except Exception as e:
-        # Log any other error message
-        log(f"Other Error: {e}")
-    time.sleep(seconds)
-
-# Define a function to run the secondary loop in a separate thread
-def secondary_loop():
-    global running
-    while running:
-        get_sheet_data()
-
-# Define a function to start the secondary loop thread
-def start_loop():
-    global running
-    start_button.config(state=tk.DISABLED)
-    update_status()
-    if status_box["text"] == "READY":
-        running = True
-        status_box.config(text="RUNNING", bg="red")
-        # Gray out the text input boxes
-        spreadsheet_id_entry.config(state="disabled")
-        worksheet_entry.config(state="disabled")
-        api_key_entry.config(state="disabled")
-        seconds_entry.config(state="disabled")
-        filename_entry.config(state="disabled") # Added to gray out the filename text box
-        # Create and start the secondary loop thread
-        thread = threading.Thread(target=secondary_loop)
-        thread.start()
-        # Log that the start button was pushed and the thread started
-        log("Start button pushed")
-        log("Secondary loop thread started")
-    else:
-        # Log that the start button was pushed but the status was not ready
-        log("Start button pushed")
-        log("Status not ready")
-        start_button.config(state=tk.NORMAL)
-
-# Define a function to stop the secondary loop thread
-def stop_loop():
-    global running
-    running = False
-    start_button.config(state=tk.NORMAL)
-    status_box.config(text="READY", bg="green")
-    # Enable the text input boxes
-    spreadsheet_id_entry.config(state="normal")
-    worksheet_entry.config(state="normal")
-    api_key_entry.config(state="normal")
-    seconds_entry.config(state="normal")
-    filename_entry.config(state="normal") # Added to enable the filename text box
-    # Log that the stop button was pushed and the thread stopped
-    log("Stop button pushed")
-    log("Secondary loop thread stopped")
-
-# Bind the start button to the start loop function
-start_button.config(command=start_loop)
-
-# Bind the stop button to the stop loop function
-stop_button.config(command=stop_loop)
-
-# Create a main loop to update the GUI
-def main_loop():
-    window.after(1000, main_loop)
-
-# Start the main loop
-main_loop()
-
-# Start the GUI
-window.mainloop()
+# start the overall class program.
+if __name__ == '__main__':
+    program = SheetsExtractProgram()
