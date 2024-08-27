@@ -1,7 +1,6 @@
 import threading
 import time
 import tkinter as tk
-from tkinter import messagebox
 import configparser
 import pandas as pd
 import requests
@@ -38,8 +37,7 @@ class SheetsExtractProgram:
         try:
             self.config.read(self.config_file)
         except Exception:
-            SheetsExtractProgram.show_error_message("Unable to load config.ini Try deleting it, or checking the "
-                                                    "headers.")
+            SheetsExtractProgram.show_error_message("Unable to load config.ini Try deleting it, or checking the headers.")
             return
 
         try:
@@ -112,7 +110,8 @@ class SheetsExtractProgram:
         self.seconds_label = tk.Label(self.frame, text="Seconds to Loop:", font=("Arial", 16))
         self.filename_entry = tk.Entry(self.frame, width=30,font=("Arial", 16))  # Changed the width to make the text box shorter
         self.filename_entry.insert(0, self.filename)  # Added to insert the filename from the config file
-        self.filename_label = tk.Label(self.frame, text="Output Filename:",font=("Arial", 16))  # Added a label for the filename
+        self.filename_label = tk.Label(self.frame, text="Output Filename:",font=("Arial", 16))
+        #  # Added a label for the filename
         self.csv_label = tk.Label(self.frame, text=".csv",font=("Arial", 16))  # Added a label to show the file extension
 
         # Create the buttons for start/stop and save
@@ -142,9 +141,9 @@ class SheetsExtractProgram:
         self.filename_label.grid(row=8, column=0)  # Added to place the filename label in the grid layout
         self.filename_entry.grid(row=8, column=1)  # Added to place the filename text box in the grid layout
         self.csv_label.grid(row=8, column=2)  # Added to place the file extension label in the grid layout
-        self.startStop_btn.grid(row=9, columnspan=2, pady=5)
-        self.save_button.grid(row=10, columnspan=2, pady=5)
-        self.status_box.grid(row=11, columnspan=2, pady=5)
+        self.startStop_btn.grid(row=11, columnspan=2, pady=5)
+        self.save_button.grid(row=12, columnspan=2, pady=5)
+        self.status_box.grid(row=13, columnspan=2, pady=5)
         # Create a text widget to display the log # Added to embed the log into the GUI
 
         self.startStop_btn.config(command=self.start_loop)
@@ -165,7 +164,7 @@ class SheetsExtractProgram:
         self.window.mainloop()
 
     def main_loop(self):
-        self.window.after(1000, self.main_loop)
+        self.window.after(2000, self.main_loop)
         self.update_status()
 
     def on_close(self):
@@ -177,7 +176,7 @@ class SheetsExtractProgram:
 
     # Define a function to update the status box based on the data fields
     def update_status(self):
-        print("updating values")
+        print("Checking For UI Updates...")
         self.spreadsheet_id = self.spreadsheet_id_entry.get()
         self.worksheet = self.worksheet_entry.get()
         self.api_key_1 = self.api_key_1_entry.get()
@@ -233,7 +232,7 @@ class SheetsExtractProgram:
 
             response = requests.get(
                 f"https://sheets.googleapis.com/v4/spreadsheets/{self.spreadsheet_id}/values/{self.worksheet}"
-                f"?key={api_key}")
+                f"?key={api_key}", timeout=2)
             response.raise_for_status()
             data = response.json()
             rows = data["values"]
@@ -246,17 +245,24 @@ class SheetsExtractProgram:
             self.error_message = ""
             # Log the success message
             self.log(
-            f"Successfully wrote to {self.filename}.csv")  # Changed to show the filename in the log message
+            f"Successfully wrote to {self.filename}.csv using API Key: {api_key}")  # Changed to show the filename in the log message
+        except requests.exceptions.ConnectionError:
+            # Log the connection error message
+            self.log(f"Connection error While using {api_key}. Moving on to the next API key.")
+            time.sleep(1)
         except requests.exceptions.HTTPError as e:
             # Log the HTTP error message
             self.log(f"HTTP Error: {e}")
+            time.sleep(1)
         except PermissionError as e:
             # Log and show the permission error message
             self.error_message = "CANNOT WRITE TO DISK, FILE IN USE"
             self.log(f"Permission Error: {e}\nYou may have the CSV file open, please close it!")
+            time.sleep(1)
         except Exception as e:
             # Log any other error message
             self.log(f"Other Error: {e}")
+            time.sleep(1)
 
 
     def export_thread(self):
@@ -316,14 +322,6 @@ class SheetsExtractProgram:
         self.filename_entry.config(state="normal")  # Added to enable the filename text box
         # Log that the stop button was pushed and the thread stopped
         self.log("Stop button pushed \nSecondary loop thread stopped")
-
-    @staticmethod
-    def show_error_message(message):
-        root = tk.Tk()
-        root.withdraw()  # Hide the root window
-        messagebox.showerror("Error", message)
-        root.destroy()  # Destroy the root window when done
-
 
 # start the overall class program.
 if __name__ == '__main__':
