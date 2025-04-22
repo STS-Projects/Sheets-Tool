@@ -1,9 +1,6 @@
 # Required libraries:
 # pip install google-api-python-client google-auth-httplib2 pandas pygame requests
 
-import ctypes
-ctypes.windll.kernel32.AllocConsole()
-
 import tkinter as tk
 from tkinter import ttk, font, messagebox
 import configparser
